@@ -1,11 +1,13 @@
-# MHService PDF — PDF Utilities CLI
+# MHService PDF — PDF & Document Utilities CLI
 
-A standalone CLI tool that handles two PDF-related operations in one JAR:
+A standalone CLI tool that handles four document operations in one JAR:
 
 - **PDF → text** — extract all text from a PDF file
+- **PDF → DOCX** — convert a PDF to an editable Word document
 - **Markdown → PDF** — convert a Markdown file to a styled PDF (Obsidian-compatible)
+- **Markdown → DOCX** — convert a Markdown file to a Word document
 
-Mode is auto-detected from the `-in` file extension: `.pdf` extracts text, `.md` produces a PDF.
+Mode is auto-detected from the `-in` and `-out` file extensions.
 
 ---
 
@@ -29,9 +31,18 @@ java -jar MHService-pdf-1.0.jar -in <file> -out <file> [-d]
 
 | Flag | Description |
 |------|-------------|
-| `-in <file>` | Input file. Extension determines the mode (`.pdf` or `.md`) |
-| `-out <file>` | Output file path (created including any missing parent directories) |
+| `-in <file>` | Input file. Extension determines the source (`.pdf` or `.md`) |
+| `-out <file>` | Output file. Extension determines the target format for `.md` input |
 | `-d` | Enable debug output |
+
+### Mode detection
+
+| `-in` extension | `-out` extension | Operation |
+|-----------------|------------------|-----------|
+| `.pdf` | `.docx` | PDF → Word document |
+| `.pdf` | anything else | PDF → text extraction |
+| `.md` | `.docx` | Markdown → Word document |
+| `.md` | anything else | Markdown → PDF |
 
 ---
 
@@ -41,43 +52,117 @@ Reads a PDF and writes its full text content to a plain-text file.
 
 ```shell
 java -jar MHService-pdf-1.0.jar \
-    -in  /path/to/document.pdf \
-    -out /path/to/output.txt
+    -in  report.pdf \
+    -out report.txt
 ```
 
 Backed by **Apache PDFBox 3.x** (`Loader.loadPDF` + `PDFTextStripper`).
 
 ---
 
-## Markdown → PDF conversion
+## PDF → DOCX
+
+Converts a PDF to an editable Word document. Text is extracted page by page, reflowed into
+paragraphs (blank-line boundaries), and written to a `.docx` file.
+
+```shell
+java -jar MHService-pdf-1.0.jar \
+    -in  report.pdf \
+    -out report.docx
+```
+
+Backed by **Apache PDFBox 3.x** (position-aware text extraction) and
+**Apache POI 5.2.5 XWPF** (Word document writer).
+
+### Table detection
+
+The converter analyses the X/Y coordinates of every text segment on each page and
+reconstructs tabular data as native Word tables:
+
+- Lines that share the same Y position are grouped into a single row.
+- Within each row, gaps wider than ~18 pt between adjacent text segments are treated as
+  column separators.
+- A block of consecutive lines is emitted as an `XWPFTable` when at least two of its lines
+  each contain two or more columns; otherwise the lines are joined into a paragraph.
+
+> **Limitations**: The algorithm works on visual text layout — fonts, colors, and cell
+> shading are not transferred. Merged cells and rotated text are not supported. Headers and
+> footers appear as regular paragraphs.
+
+---
+
+## Markdown → PDF
 
 Converts a Markdown file to a PDF with professional typography.
 
 ```shell
 java -jar MHService-pdf-1.0.jar \
-    -in  /path/to/note.md \
-    -out /path/to/output.pdf
+    -in  notes/meeting.md \
+    -out export/meeting.pdf
 ```
 
-### Supported Markdown features
+Backed by **flexmark-java 0.64.8** (Markdown → XHTML) and
+**Flying Saucer 9.1.22 + OpenPDF** (XHTML → PDF).
+
+### PDF styling
+
+- **Page size**: A4 with 2 cm margins on all sides
+- **Body font**: Helvetica / Arial, 11 pt, line-height 1.5
+- **Headings**: scaled 22 pt → 11 pt with `h1`/`h2` underlines
+- **Code blocks**: monospace (Courier), light grey background, left accent border
+- **Tables**: full border, header row in bold
+- **Strikethrough**: line-through, muted grey
+
+---
+
+## Markdown → DOCX
+
+Converts a Markdown file to a Word (`.docx`) document.
+
+```shell
+java -jar MHService-pdf-1.0.jar \
+    -in  notes/meeting.md \
+    -out export/meeting.docx
+```
+
+Backed by **flexmark-java 0.64.8** (Markdown parser) and
+**Apache POI 5.2.5 XWPF** (Word document writer).
+
+### DOCX styling
+
+- **Page margins**: 2 cm on all sides
+- **Body font**: 11 pt; headings scale from 22 pt (H1) to 11 pt (H6), all bold
+- **H1 / H2**: bottom border rule for visual separation
+- **Code blocks**: Courier New 9 pt, light grey paragraph shading
+- **Tables**: visible borders on all cells; header row is bold
+- **Task lists**: ☑ / ☐ prefix characters
+- **Blockquotes**: indented, italic
+
+---
+
+## Supported Markdown features
 
 | Feature | Syntax |
 |---------|--------|
 | Headings | `# H1` … `###### H6` |
 | Bold / italic | `**bold**`, `*italic*` |
 | Strikethrough | `~~text~~` |
-| Code inline | `` `code` `` |
-| Code block | ` ``` … ``` ` |
-| Tables | GFM pipe tables |
+| Inline code | `` `code` `` |
+| Fenced code block | ` ``` … ``` ` |
+| Indented code block | 4-space indent |
+| GFM tables | pipe `\|` syntax |
 | Task lists | `- [x]` / `- [ ]` |
 | Blockquotes | `> …` |
+| Nested lists | indented `- ` or `1. ` |
 | Links | `[text](url)` |
 | Horizontal rule | `---` |
 
-### YAML front matter
+---
+
+## YAML front matter
 
 Obsidian-style front matter is stripped before conversion.
-The `title:` field, if present, becomes the PDF document title.
+The `title:` field, if present, is used as the PDF document title.
 
 ```yaml
 ---
@@ -87,19 +172,6 @@ tags: [foo, bar]
 
 # Actual content starts here
 ```
-
-### PDF styling
-
-- **Page size**: A4 with 2 cm margins on all sides
-- **Body font**: Helvetica / Arial, 11 pt, line-height 1.5
-- **Headings**: scaled 22 pt → 12 pt with `h1`/`h2` underlines
-- **Code blocks**: monospace (Courier), light grey background, left accent border
-- **Tables**: full border, header row shaded
-- **Links**: blue (`#5B6EC1`)
-- **Strikethrough**: line-through, muted grey
-
-Backed by **flexmark-java 0.64.8** (Markdown → XHTML) and
-**Flying Saucer 9.1.22 + OpenPDF** (XHTML → PDF).
 
 ---
 
@@ -111,11 +183,17 @@ JAR=target/MHService-pdf-1.0.jar
 # Extract text from a PDF
 java -jar $JAR -in report.pdf -out report.txt
 
-# Convert an Obsidian note to PDF
+# Convert a PDF to an editable Word document
+java -jar $JAR -in report.pdf -out report.docx
+
+# Convert a Markdown note to PDF
 java -jar $JAR -in notes/meeting.md -out export/meeting.pdf
 
-# Convert with debug output
-java -jar $JAR -d -in notes/meeting.md -out export/meeting.pdf
+# Convert a Markdown note to Word
+java -jar $JAR -in notes/meeting.md -out export/meeting.docx
+
+# Any mode with debug output
+java -jar $JAR -d -in report.pdf -out report.docx
 ```
 
 ---
@@ -124,6 +202,6 @@ java -jar $JAR -d -in notes/meeting.md -out export/meeting.pdf
 
 | Code | Meaning |
 |------|---------|
-| `0` | Operation succeeded (prints `Successfull`) |
-| `-1` | Missing or invalid arguments (prints usage) |
-| `0` | Operation failed — input not found or processing error (prints `Failed`) |
+| `0` | Operation succeeded — prints `Successfull` |
+| `-1` | Missing or invalid arguments — prints usage |
+| `0` | Operation failed — input not found or processing error — prints `Failed` |
