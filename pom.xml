@@ -36,11 +36,32 @@
             <artifactId>flexmark-all</artifactId>
             <version>0.64.8</version>
         </dependency>
+        <!-- Markdown → DOCX (Apache POI XWPF) -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
         <!-- XHTML → PDF (Flying Saucer + OpenPDF) -->
         <dependency>
             <groupId>org.xhtmlrenderer</groupId>
             <artifactId>flying-saucer-pdf-openpdf</artifactId>
             <version>9.1.22</version>
+            <exclusions>
+                <!-- Exclude logback so slf4j-nop is the only SLF4J binding in the fat JAR -->
+                <exclusion>
+                    <groupId>ch.qos.logback</groupId>
+                    <artifactId>logback-classic</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- Silence Log4j2 "no implementation found" warning from Apache POI:
+             bridge routes log4j2-api → SLF4J → logback (silenced via logback.xml). -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-to-slf4j</artifactId>
+            <version>2.24.3</version>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 

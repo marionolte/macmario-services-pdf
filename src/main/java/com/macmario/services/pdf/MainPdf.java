@@ -35,12 +35,20 @@ public class MainPdf extends Version {
         }
 
         boolean ok;
-        if (in.toLowerCase().endsWith(".md")) {
-            MdToPdf converter = new MdToPdf(in, out);
-            ok = converter.convert();
+        String inLower  = in.toLowerCase();
+        String outLower = out.toLowerCase();
+        if (inLower.endsWith(".pdf") && outLower.endsWith(".docx")) {
+            ok = new PdfToDocx(in, out).convert();
+        } else if (inLower.endsWith(".pdf")) {
+            ok = new PdfReader(in, out).extract();
+        } else if (inLower.endsWith(".md") && outLower.endsWith(".docx")) {
+            ok = new MdToDocx(in, out).convert();
+        } else if (inLower.endsWith(".md")) {
+            ok = new MdToPdf(in, out).convert();
         } else {
-            PdfReader reader = new PdfReader(in, out);
-            ok = reader.extract();
+            usage();
+            System.exit(-1);
+            return;
         }
         System.out.println(ok ? "Successfull" : "Failed");
         System.exit(0);
@@ -48,10 +56,12 @@ public class MainPdf extends Version {
 
     private static void usage() {
         System.out.println("java -jar " + jarfile + " -in <file> -out <file>");
-        System.out.println("  -in  <pdf-file>   PDF → text: extract text from PDF");
-        System.out.println("  -in  <md-file>    MD  → PDF : convert Markdown to PDF");
+        System.out.println("  -in  <pdf-file>  -out <txt>   PDF → text  : extract text from PDF");
+        System.out.println("  -in  <pdf-file>  -out <docx>  PDF → DOCX : convert PDF to Word document");
+        System.out.println("  -in  <md-file>   -out <pdf>   MD  → PDF  : convert Markdown to PDF");
+        System.out.println("  -in  <md-file>   -out <docx>  MD  → DOCX : convert Markdown to Word document");
         System.out.println("  -out <out-file>   output path");
         System.out.println("  -d                enable debug output");
-        System.out.println("Mode is detected from the -in file extension (.pdf → text, .md → pdf).");
+        System.out.println("Mode is detected from -in extension; output format from -out extension.");
     }
 }
